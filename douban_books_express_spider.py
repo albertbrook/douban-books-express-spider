@@ -4,6 +4,7 @@ import json
 import webbrowser
 import requests
 from lxml import etree
+from CreatePage import CreatePage as Page
 
 
 class DSpider(object):
@@ -25,9 +26,11 @@ class DSpider(object):
         except FileExistsError:
             pass
         os.chdir(self.folder)
+        Page.open(self.folder)
         li_list = self.html.xpath("//div[@class='carousel']//li")
         for li in li_list:
             self.save_book(li)
+        Page.close()
 
     def save_book(self, li):
         info = {
@@ -36,12 +39,14 @@ class DSpider(object):
             "author": li.xpath(".//span[@class='author']/text()")[0].strip(),
             "year": li.xpath(".//span[@class='year']/text()")[0].strip(),
             "publisher": li.xpath(".//span[@class='publisher']/text()")[0].strip(),
-            "resume": li.xpath(".//p[@class='abstract']/text()")[0].strip()
+            "resume": li.xpath(".//p[@class='abstract']/text()")[0].strip(),
+            "link": li.xpath(".//div[@class='title']/a/@href")[0].strip()
         }
         folder = self.create_folder(info["title"])
-        self.save_img(info["img"], folder)
+        img = self.save_img(info["img"], folder)
         with open("%s/info.json" % folder, "w", encoding="utf-8") as file:
             file.write(json.dumps(info, ensure_ascii=False))
+        Page.write(img, **info)
         print("save %s" % folder)
 
     def create_folder(self, folder):
@@ -60,33 +65,13 @@ class DSpider(object):
         return folder
 
     def save_img(self, url, folder):
-        file = "/%s" % url.split("/")[-1]
-        with open(folder + file, mode="wb") as image:
+        file = "%s/%s" % (folder, url.split("/")[-1])
+        with open(file, mode="wb") as image:
             response = requests.get(url, headers=self.headers)
             image.write(response.content)
+        return file
 
     def show_web(self):
-        div_str = self.html.xpath("//div[@class='carousel']")[0]
-        div = etree.tostring(div_str, method="html")
-        with open("%s.html" % self.folder, "w") as html:
-            html_str = """
-            <!DOCTYPE html>
-            <html lang="en">
-            <head>
-                <meta charset="UTF-8">
-                <style type="text/css">
-                    li{width:150px;display:inline-block;}
-                </style>
-            </head>
-            <body>
-            """
-            html.write(html_str)
-            html.write(div.decode('utf-8'))
-            html_str = """
-            </body>
-            </html>
-            """
-            html.write(html_str)
         print("html file in '%s'" % os.getcwd())
         print("do you want to open the easy web? [y or n]: ", end="")
         if input() == "y":
